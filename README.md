@@ -1,84 +1,266 @@
-# Cosmoquake Analyzer Algorithm
+<div align="center">
 
-The **Cosmoquake Analyzer Algorithm** is an innovative approach for analyzing extraterrestrial seismic activity. It addresses the limitations of traditional STA/LTA (Short Term - Long Term) algorithms by significantly reducing the data size, improving feature extraction, and enhancing the classification of rare seismic events like shallow quakes. The solution applies both signal processing and machine learning techniques to tackle this challenge, making seismic event analysis faster and more efficient.
+# Cosmoquake Analyzer
 
-## Description
+**Detect, compress and classify seismic events in Apollo and InSight records.**
 
-Extraterrestrial seismic events are challenging to process due to the sheer volume of data they generate. Traditional STA/LTA algorithms, while effective in detecting seismic waves, produce data that is difficult to handle, process, and transfer. Our **Cosmoquake Analyzer Algorithm** addresses these challenges by:
+[![CI](https://github.com/V47VANSH/Richter_Victors-Cosmoquake_Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/V47VANSH/Richter_Victors-Cosmoquake_Analyzer/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Docker ready](https://img.shields.io/badge/docker-ready-2496ed.svg)](Dockerfile)
 
-1. Identifying the arrival time and extent of aftershock waves using the traditional STA/LTA method.
-2. Focusing only on the relevant data between seismic events.
-3. Applying a Fourier transform to calculate absolute velocities and corresponding frequencies, discarding irrelevant data such as negative frequencies.
-4. Extracting key features like maximum velocity, frequency-weighted velocity, mean velocity, frequency of maximum amplitude, and area under the curve.
+*NASA Space Apps Challenge 2024 — Seismic Detection Across the Solar System*
 
-This drastically reduces the data size while retaining valuable information for analysis.
+</div>
 
-## Significance
+---
 
-The identification and classification of seismic events are crucial for understanding the internal structures and geophysical phenomena of extraterrestrial bodies, particularly rare shallow quakes that provide insights into planetary activities. The Cosmoquake Analyzer helps overcome the following challenges:
+## The problem
 
-- **Data transfer issues**: Reducing data from gigabytes to kilobytes makes it manageable.
-- **Class imbalance**: Seismic datasets often contain an imbalance between rare and common events, which we address with machine learning techniques.
-- **Simplification of analysis**: Despite complex data, our approach uses a Random Forest Classifier fine-tuned with boosting, making it more efficient than previously complex models.
+A planetary seismometer generates far more data than it can send home. Apollo's
+network returned a continuous trickle for years; InSight's bandwidth on Mars was
+tighter still. Sending raw waveforms is impossible, but the interesting part of
+a record — a quake — occupies a few minutes out of hours of silence.
 
-## Novelty of Our Solution
+Cosmoquake Analyzer finds that part on-station and downlinks a summary instead
+of the signal.
 
-The key innovations of the Cosmoquake Analyzer include:
+```
+  ┌────────────┐   ┌───────────────┐   ┌──────────────┐   ┌───────────────┐
+  │   read     │──▶│  STA/LTA      │──▶│  FFT feature │──▶│ random forest │
+  │ csv/mseed  │   │  arrival time │   │  extraction  │   │  classifier   │
+  └────────────┘   └───────────────┘   └──────────────┘   └───────────────┘
+     576 KB            arrival: t=1670 s       48 bytes        impact_mq
+                                                              ~12,000× smaller
+```
 
-1. **Data reduction and Feature Engineering**: Traditional methods generate overwhelming amounts of data. We reduce this by focusing only on the data between seismic events and applying a fast Fourier transform and consecutive feature engineering to extract relevant features. The data size can be reduced from 1.38GB to mere 9.06 kilobytes which is reduction of data to about 0.000613% of the original. This facilitates easy transfer of data which was a key challenge.
-   
-2. **Random Forest Classifier with boosting**: Unlike typical seismic analysis approaches that rely on complex models, we use a Random Forest Classifier, which is simpler but still powerful when combined with boosting techniques. This approach ensures the classification of seismic events, including rare shallow quakes, with high accuracy.
-   
-- It does not assume any data distribution and can handle non-linearity effectively.
-- The bootstrapping allows sufficient training over rare examples.
-- It is resilient to over-fitting.
-- Does fast predictions in O(logn) time.
-- It is easy to store and deploy.
-- It can do feature selection on its own, eliminating any irrelevant statistical fallacy on its own.
-- This does not consume a lot of computational power and energy like artificial neural networks which is limited for extraterrestrial systems which have to work in harsh environment.
+One hour of 20 Hz InSight data is 576 KB of samples. What leaves the station is
+five floating-point features plus an arrival time — **48 bytes**.
 
-3. **Using the Aftershock waves**: The aftershock waves of a seismic event give a lot of information of planetary signature and impact of the event on the given celestial body. For example a meteor hit, on the Moon shall be more significant as a seismic event than on the Mars. We used them to calculate the strength of the quake.
+## Quickstart
 
+```bash
+git clone https://github.com/V47VANSH/Richter_Victors-Cosmoquake_Analyzer.git
+cd Richter_Victors-Cosmoquake_Analyzer
 
-   ![image](https://github.com/user-attachments/assets/4675350c-c3cc-4332-80aa-3d799922516d)
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e ".[web,dev]"
 
-   
-# Repository Flow
-## Resources folder
-It is added for reference of the resources provided in the problem, though lunar data could not be uploaded due to file size constraints.
-## Main folder
-This holds our actual solution, and its usage is as follows:
-### Files
+cosmoquake predict Resources/Data/mars/test/data/XB.ELYSE.02.BHV.2022-05-04HR23_evid0001.csv
+```
 
-- `Moonquakes.csv`: Sample custom training data generated from NASA's Apollo mission data (post feature engineering).
-- `moonquake_model.joblib`: Pretrained Random Forest Classifier model.
-- `Training and preparation code.ipynb`: Notebook containing the source code for training the model.
-- `Testcaseandinputprocess.ipynb`: Notebook containing the final code for testing and predicting seismic events using preprocessed test files.
+```
+XB.ELYSE.02.BHV.2022-05-04HR23_evid0001.csv
+  event         impact_mq  (Meteoroid impact)
+  confidence    98.3%
+  arrival       1,670.1 s
+  record        71,999 samples, 3,600 s @ 20.00 Hz
+  downlink      575,992 B -> 12,000x smaller
+  features
+    max_velocity      9229.01
+    weighted_velocity 1206.71
+    mean_velocity     1279.17
+    freq_of_max       2.44527
+    area              1.16426e+08
+  probabilities
+    impact_mq         98.3%
+    shallow_mq        1.7%
+    deep_mq           0.0%
+  WARNING       5 of 5 features fall outside the training range ...
+```
 
+That warning is the tool working correctly — see [Honest results](#honest-results).
 
-## Usage
+## Web service
 
-### Training the Model
+```bash
+cosmoquake serve            # http://localhost:8000
+```
 
-1. Add the data folder provided in the resources is added to the directory as the training code.
-2. Run the `Training and preparation code.ipynb` notebook to preprocess the data and train the model.
-3. The trained model will be saved as `moonquake_model.joblib`.
+Or with Docker:
 
-### Testing the Model
+```bash
+docker compose up --build   # http://localhost:8000
+```
 
-1. Place your test data in both `.csv` and `.mseed` formats by naming them `testit.csv` and `testit.mseed`.
-2. Run the `Testcaseandinputprocess.ipynb` notebook to preprocess the test files and predict the class of moonquakes.
+Drag a `.csv` or `.mseed` file onto the page to get an arrival time, the
+extracted features and a classification.
 
-## Working
+| Endpoint | Purpose |
+|---|---|
+| `GET /` | Upload interface |
+| `GET /health` | Liveness probe; reports whether the model loaded |
+| `GET /api/model` | Classes, feature importances, training range, CV scores |
+| `POST /api/predict` | Classify an uploaded record |
+| `GET /docs` | Interactive OpenAPI documentation |
 
-The algorithm uses the following steps:
+```bash
+curl -F "file=@trace.mseed" http://localhost:8000/api/predict
+```
 
-1. **STA/LTA Detection**: Traditional seismic analysis algorithms are used to detect the arrival and extent of aftershocks.
-2. **Fourier Transform**: Converts seismic data into the frequency domain, discarding irrelevant negative frequencies and keeping only the useful data.
-3. **Feature Extraction**: Key features such as max velocity, frequency-weighted velocity, mean velocity, and area under the curve are extracted to reduce data size.
-4. **Classification**: A Random Forest Classifier with boosting is used to classify the seismic events, with a focus on rare cases like shallow quakes.
+## Command line
 
-## Possible future additions:
-1. Integration of a seismic wave measuremnt based activation function into the nodes of decision tree, and customisation of it.
-2. Solving the epicenter location problem. As we can't know the epicenters of the seismic events easily on the celestial body, the true magnitude cannot be assesed. It can be done in future using a satellite monitoring system integrated to provide data of distance from epicenter to detector. Then the logarithm of this distance can be used to get the true assesment of strength on standard scale.
+```bash
+cosmoquake predict trace.mseed              # classify one or more records
+cosmoquake predict trace.csv --json         # machine-readable output
+cosmoquake catalog data/ -o catalog.csv     # score a directory into a catalog
+cosmoquake train                            # retrain and report honest metrics
+cosmoquake info                             # what the packaged model knows
+cosmoquake serve --port 8080                # run the web service
+```
 
+`catalog` emits the column headers the challenge requires for scoring
+(`filename`, `time_rel(sec)`, `mq_type`) plus confidence and the raw features.
+
+Detector windows are tunable where the defaults do not suit a record:
+
+```bash
+cosmoquake predict trace.mseed --sta 60 --lta 300 --thr-on 3.5 --thr-off 1.2
+```
+
+## Python API
+
+```python
+from cosmoquake import analyze, load_model
+
+model = load_model()
+result = analyze("trace.mseed", model=model)
+
+print(result.label, result.confidence)   # impact_mq 0.983
+print(result.detection.arrival_time)     # 1670.1
+print(result.features.to_dict())         # the five downlinked numbers
+print(result.trustworthy)                # False on non-Apollo data
+```
+
+## How it works
+
+**1. Arrival detection (STA/LTA).** A short and a long window slide across the
+trace; a quake spikes the short-window average while the long window still
+holds background noise. The ratio crossing a threshold marks the onset.
+
+**2. Spectral feature extraction.** Everything after the arrival is
+Fourier-transformed. Negative frequencies carry nothing new for a real signal
+and are discarded. Five descriptors survive:
+
+| Feature | Meaning |
+|---|---|
+| `max_velocity` | Peak spectral amplitude — how strong the event was |
+| `weighted_velocity` | Amplitude-weighted mean frequency — the spectral centre of mass |
+| `mean_velocity` | Mean amplitude across the band |
+| `freq_of_max` | Frequency carrying the peak |
+| `area` | Area under the frequency-weighted spectrum — a radiated-energy proxy |
+
+**3. Classification.** A random forest sorts the event into impact, deep
+moonquake or shallow moonquake. A forest is deliberate: it assumes no
+distribution, resists overfitting, selects features on its own, predicts in
+logarithmic time, and runs in a power budget a neural network would not fit
+into on a rover.
+
+## Honest results
+
+**The classifier reliably identifies impacts. It does not work for deep or
+shallow moonquakes, and the training catalog is too small for it to.**
+
+3-fold cross-validation on the 76-event Apollo 12 catalog:
+
+| Metric | Value |
+|---|---:|
+| Accuracy | 81.6% |
+| **Majority-class baseline** | **84.2%** |
+| Balanced accuracy | 32.3% |
+| `impact_mq` recall | 0.97 |
+| `deep_mq` recall | 0.00 |
+| `shallow_mq` recall | 0.00 |
+
+Out of fold the model never predicts a rare class, and its rare-class ranking
+AUC is ~0.50 — chance. The five features carry no measurable signal separating
+deep and shallow moonquakes from impacts here. Rebalancing, log transforms,
+depth limits and different estimators were all measured; none found signal that
+was not there. Full comparison in the [model card](docs/MODEL_CARD.md).
+
+With 9 deep and 3 shallow events, that ceiling is set by the catalog. The
+detection, compression and feature stages hold up independently and are the
+parts worth reusing.
+
+Two guardrails keep this visible at runtime:
+
+- Every prediction carries a `trustworthy` flag and, when features land outside
+  the training range, a warning explaining why the confidence is not meaningful.
+- Applying the lunar model to Mars data (counts/s versus m/s, twelve orders of
+  magnitude apart) trips that warning rather than silently returning 98%
+  confidence.
+
+## Repository layout
+
+```
+src/cosmoquake/        the package
+  waveform.py            reading Apollo and InSight records
+  detection.py           STA/LTA arrival detection
+  features.py            FFT feature extraction
+  model.py               training, persistence, out-of-range guard
+  pipeline.py            end-to-end analysis
+  cli.py                 command-line interface
+  web/                   FastAPI service and upload UI
+data/moonquakes.csv    76 engineered Apollo 12 events
+models/                the trained artifact
+tests/                 54 tests
+notebooks/             the original hackathon notebooks, kept as a record
+Resources/             NASA-provided sample data
+docs/MODEL_CARD.md     metrics, limitations, intended use
+```
+
+## Deployment
+
+The image is self-contained and honours `$PORT`, so it runs unmodified on
+Render, Railway, Fly.io, Cloud Run or any container host.
+
+```bash
+docker build -t cosmoquake .
+docker run -p 8000:8000 cosmoquake
+```
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `8000` | Listen port |
+| `COSMOQUAKE_MODEL` | bundled | Path to a model artifact |
+| `COSMOQUAKE_DATASET` | bundled | Path to the training table |
+| `COSMOQUAKE_MAX_UPLOAD_MB` | `64` | Upload size limit |
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for platform-specific steps.
+
+## Development
+
+```bash
+pip install -e ".[web,dev]"
+pytest              # 54 tests
+ruff check .
+cosmoquake train    # rebuild the model artifact
+```
+
+## What changed in v1.0
+
+The original submission was two Jupyter notebooks. The science is unchanged;
+the engineering around it was rebuilt, and four defects were fixed along the way:
+
+- **Wrong label mapping.** Inference mapped forest output `2` to `deep_mq` when
+  the encoder had assigned `2` to `shallow_mq`, and never emitted `deep_mq` at
+  all. Training on string labels removes the hand-written mapping entirely.
+- **Sample indices read as seconds.** `trigger_onset` returns sample indices,
+  which were compared directly against a time-in-seconds column — off by a
+  factor of the sampling rate (20× on InSight data).
+- **Hardcoded scaler constants.** The training minima and maxima were pasted
+  into the inference code as literals, silently invalidated by any retrain. The
+  scaler now travels inside the model artifact.
+- **`np.asfarray`.** Removed in NumPy 2.0; the notebooks no longer run on a
+  current install.
+
+## Credits
+
+Built by **Team Richter Victors** for NASA Space Apps Challenge 2024.
+
+Data courtesy of NASA's Apollo Passive Seismic Experiment and the InSight
+mission (SEIS). Signal processing uses [ObsPy](https://docs.obspy.org/).
+
+## License
+
+[MIT](LICENSE).

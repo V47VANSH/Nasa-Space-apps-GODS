@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cosmoquake"
+version = "1.0.0"
+description = "Detect and classify seismic events on the Moon and Mars from Apollo and InSight records"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = ["seismology", "planetary-science", "moonquake", "marsquake", "obspy", "nasa"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "scipy>=1.11",
+    "scikit-learn>=1.4",
+    "obspy>=1.4",
+    "joblib>=1.3",
+]
+
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "python-multipart>=0.0.9",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "httpx>=0.27",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+cosmoquake = "cosmoquake.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/V47VANSH/Richter_Victors-Cosmoquake_Analyzer"
+Issues = "https://github.com/V47VANSH/Richter_Victors-Cosmoquake_Analyzer/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cosmoquake = ["web/static/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+# The notebooks are preserved as a historical record of the hackathon
+# submission; they are documentation, not maintained source.
+extend-exclude = ["notebooks", "Main", "Resources"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+ignore = ["B008"]  # FastAPI's File(...) default is the documented idiom
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]

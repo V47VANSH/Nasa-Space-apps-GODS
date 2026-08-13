@@ -1,0 +1,10 @@
+# One-click deploy on Render: New > Blueprint, point at this repository.
+services:
+  - type: web
+    name: cosmoquake-analyzer
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: COSMOQUAKE_MAX_UPLOAD_MB
+        value: "32"

@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cosmoquake Analyzer</title>
+<style>
+  :root {
+    --bg: #0b0e17;
+    --panel: #141926;
+    --panel-2: #1b2233;
+    --line: #27304a;
+    --text: #e6ebf5;
+    --muted: #8e9bb8;
+    --accent: #6ea8ff;
+    --warn: #ffb454;
+    --ok: #52d39a;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 50% -10%, #1a2440 0%, var(--bg) 60%);
+    color: var(--text);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 48px 20px 80px; }
+  header { text-align: center; margin-bottom: 36px; }
+  h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); margin: 0; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px;
+    margin-bottom: 18px;
+  }
+  #drop {
+    border: 2px dashed var(--line);
+    border-radius: var(--radius);
+    padding: 44px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #drop:hover, #drop.over { border-color: var(--accent); background: var(--panel-2); }
+  #drop p { margin: 6px 0; }
+  .hint { color: var(--muted); font-size: 13px; }
+  input[type=file] { display: none; }
+  .verdict { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .label { font-size: 26px; font-weight: 650; }
+  .conf { color: var(--muted); }
+  .desc { color: var(--muted); margin: 4px 0 18px; }
+  .bar { height: 8px; background: var(--panel-2); border-radius: 99px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+  .row { display: grid; grid-template-columns: 130px 1fr 62px; gap: 10px; align-items: center; margin: 7px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .stat { background: var(--panel-2); border-radius: 10px; padding: 12px 14px; }
+  .stat b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 22px 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  td { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  td:last-child { text-align: right; }
+  .warn {
+    background: rgba(255,180,84,.1);
+    border: 1px solid rgba(255,180,84,.35);
+    color: var(--warn);
+    border-radius: 10px; padding: 12px 14px; margin-top: 16px; font-size: 14px;
+  }
+  .err { color: #ff8080; }
+  .muted { color: var(--muted); }
+  footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 28px; }
+  a { color: var(--accent); }
+  .spin { display: inline-block; width: 15px; height: 15px; border: 2px solid var(--line);
+          border-top-color: var(--accent); border-radius: 50%; animation: r .8s linear infinite;
+          vertical-align: -3px; margin-right: 8px; }
+  @keyframes r { to { transform: rotate(360deg); } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Cosmoquake Analyzer</h1>
+    <p class="sub">Detect and classify seismic events in Apollo and InSight records</p>
+  </header>
+
+  <div class="card">
+    <div id="drop" role="button" tabindex="0" aria-label="Upload a seismic record">
+      <p><strong>Drop a seismic record here</strong> or click to browse</p>
+      <p class="hint">.csv or .mseed &middot; Apollo (m/s) or InSight (counts/s)</p>
+    </div>
+    <input type="file" id="file" accept=".csv,.mseed,.miniseed,.msd">
+  </div>
+
+  <div class="card" id="status" hidden></div>
+  <div class="card" id="result" hidden></div>
+
+  <footer>
+    <a href="/docs">API docs</a> &middot;
+    <a href="https://github.com/V47VANSH/Richter_Victors-Cosmoquake_Analyzer">Source</a>
+  </footer>
+</div>
+
+<script>
+const drop = document.getElementById('drop');
+const input = document.getElementById('file');
+const statusEl = document.getElementById('status');
+const resultEl = document.getElementById('result');
+
+const num = (v, d = 3) => Number(v).toLocaleString(undefined, { maximumFractionDigits: d });
+const pct = v => (v * 100).toFixed(1) + '%';
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function sci(v) {
+  const a = Math.abs(v);
+  return (a !== 0 && (a < 1e-3 || a >= 1e6)) ? Number(v).toExponential(3) : num(v, 4);
+}
+
+drop.addEventListener('click', () => input.click());
+drop.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+});
+['dragenter', 'dragover'].forEach(evt =>
+  drop.addEventListener(evt, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(evt =>
+  drop.addEventListener(evt, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => {
+  if (e.dataTransfer.files.length) upload(e.dataTransfer.files[0]);
+});
+input.addEventListener('change', () => { if (input.files.length) upload(input.files[0]); });
+
+async function upload(file) {
+  resultEl.hidden = true;
+  statusEl.hidden = false;
+  statusEl.innerHTML = `<span class="spin"></span>Analysing <strong>${esc(file.name)}</strong>…`;
+
+  const body = new FormData();
+  body.append('file', file);
+  try {
+    const res = await fetch('/api/predict', { method: 'POST', body });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `request failed (${res.status})`);
+    statusEl.hidden = true;
+    render(data);
+  } catch (err) {
+    statusEl.innerHTML = `<span class="err"><strong>Could not analyse this file.</strong><br>${esc(err.message)}</span>`;
+  }
+}
+
+function render(d) {
+  const det = d.detection, rec = d.record;
+  const arrival = det.triggered
+    ? num(det.arrival_time, 1) + ' s'
+    : 'no trigger — whole record analysed';
+
+  const probs = Object.entries(d.probabilities).map(([k, v]) => `
+    <div class="row">
+      <span>${esc(k)}</span>
+      <span class="bar"><span style="width:${(v * 100).toFixed(1)}%"></span></span>
+      <span class="muted" style="text-align:right">${pct(v)}</span>
+    </div>`).join('');
+
+  const feats = Object.entries(d.features).map(([k, v]) => `
+    <tr><td>${esc(k)}</td><td>${sci(v)}</td></tr>`).join('');
+
+  resultEl.innerHTML = `
+    <div class="verdict">
+      <span class="label">${esc(d.label)}</span>
+      <span class="conf">${pct(d.confidence)} confidence</span>
+    </div>
+    <p class="desc">${esc(d.description)} &middot; <span class="muted">${esc(d.source)}</span></p>
+
+    <div class="grid">
+      <div class="stat"><span>Arrival</span><b>${arrival}</b></div>
+      <div class="stat"><span>Duration</span><b>${num(rec.duration_seconds, 0)} s</b></div>
+      <div class="stat"><span>Sampling</span><b>${num(rec.sampling_rate, 2)} Hz</b></div>
+      <div class="stat"><span>Samples</span><b>${num(rec.n_samples, 0)}</b></div>
+      <div class="stat"><span>Downlink</span><b>${num(rec.downlink_bytes, 0)} B</b></div>
+      <div class="stat"><span>Reduction</span><b>${num(rec.compression_ratio, 0)}&times;</b></div>
+    </div>
+
+    <h2>Class probabilities</h2>${probs}
+    <h2>Extracted features</h2><table>${feats}</table>
+    ${d.warning ? `<div class="warn"><strong>Out of training range.</strong> ${esc(d.warning)}</div>` : ''}`;
+  resultEl.hidden = false;
+}
+</script>
+</body>
+</html>
